@@ -1,0 +1,6 @@
+[project]
+name = "astria-notifier"
+version = "0.0.0"
+description = "Pengiriman notifikasi lewat kanal."
+requires-python = ">=3.14"
+dependencies = []
