@@ -24,7 +24,8 @@ def build_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     channels = settings.channels()
     runtime = standard_runtime(settings, metadata=[metadata])
-    runtime.add(PolicyStatus(channels))
+    if channels is not None:
+        runtime.add(PolicyStatus(channels))
     if runtime.db is not None and runtime.bus is not None:
         key = settings.service_key_bytes()
         # Tanpa kebijakan, konsumen akan meng-ack event tanpa baris outbox (hilang): gagal start saja.

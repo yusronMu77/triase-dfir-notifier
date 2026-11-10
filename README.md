@@ -83,7 +83,7 @@ Untuk `digest.published`, `payload` = `{"digest_id", "jenis", "periode_mulai", "
 
 | Env | Bawaan | Catatan |
 |---|---|---|
-| `ASTRIA_NOTIFIER_CHANNELS` / `ASTRIA_NOTIFIER_CHANNELS_FILE` | kosong | Daftar kanal JSON (berkas diutamakan). Wajib bila basis data dan NATS diisi (tanpa kebijakan event akan hilang); kosong tanpa konsumen = `/ready` 503; isi tidak valid = gagal start |
+| `ASTRIA_NOTIFIER_CHANNELS` / `ASTRIA_NOTIFIER_CHANNELS_FILE` | kosong | Daftar kanal JSON (berkas diutamakan). Wajib bila basis data dan NATS diisi (tanpa kebijakan event akan hilang); kosong tanpa konsumen = tanpa pemeriksaan kebijakan; isi tidak valid = gagal start |
 | `ASTRIA_NOTIFIER_PUBLIC_BASE_URL` | kosong | Basis tautan dasbor; wajib bila basis data dan NATS diisi |
 | `ASTRIA_SERVICE_KEY` / `ASTRIA_SERVICE_KEY_FILE` | kosong | Kunci HMAC (hex) untuk tanda tangan push; wajib bila basis data dan NATS diisi |
 | `ASTRIA_NOTIFIER_GATEWAY_URL` | `http://gateway:8080` | Origin listener internal Gateway (tanpa path) |
