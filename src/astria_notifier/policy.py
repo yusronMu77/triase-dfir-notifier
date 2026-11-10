@@ -27,7 +27,7 @@ class Channel(BaseModel):
     band_min: Band = "TINGGI"
     event_types: list[EventType] = Field(min_length=1)
     external: bool = True
-    """Kanal keluar organisasi. Messenger (Telegram, WhatsApp) selalu eksternal; hanya email internal yang boleh `false`."""
+    """Kanal keluar organisasi. Telegram dan WhatsApp selalu eksternal; hanya email internal boleh `false`."""
 
     @model_validator(mode="after")
     def _messenger_selalu_eksternal(self) -> Channel:
