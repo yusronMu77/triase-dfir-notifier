@@ -21,6 +21,12 @@ def test_telegram_cannot_be_internal_and_unknown_fields_are_rejected() -> None:
         channel(label_tambahan="x")
 
 
+def test_whatsapp_is_a_messenger_and_always_external() -> None:
+    assert channel(type="whatsapp").external is True
+    with pytest.raises(ValidationError, match="whatsapp selalu external"):
+        channel(type="whatsapp", external=False)
+
+
 def test_parse_channels_rejects_duplicate_ids() -> None:
     one = '{"channel_id": "a", "type": "email", "label": "A", "event_types": ["card.verified"]}'
     assert [c.channel_id for c in parse_channels(f"[{one}]")] == ["a"]
