@@ -20,19 +20,19 @@ class Channel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     channel_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,62}$")
-    type: Literal["email", "telegram"]
+    type: Literal["email", "telegram", "whatsapp"]
     label: str = Field(min_length=1, max_length=100)
     enabled: bool = False
     max_detail: Literal["minimal", "ringkas"] = "minimal"
     band_min: Band = "TINGGI"
     event_types: list[EventType] = Field(min_length=1)
     external: bool = True
-    """Kanal keluar organisasi. Telegram selalu eksternal; hanya email internal yang boleh `false`."""
+    """Kanal keluar organisasi. Messenger (Telegram, WhatsApp) selalu eksternal; hanya email internal yang boleh `false`."""
 
     @model_validator(mode="after")
-    def _telegram_selalu_eksternal(self) -> Channel:
-        if self.type == "telegram" and not self.external:
-            raise ValueError("kanal telegram selalu external")
+    def _messenger_selalu_eksternal(self) -> Channel:
+        if self.type in ("telegram", "whatsapp") and not self.external:
+            raise ValueError(f"kanal {self.type} selalu external")
         return self
 
 
