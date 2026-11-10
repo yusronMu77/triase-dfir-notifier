@@ -19,9 +19,11 @@ def test_health_and_ready_with_policy_without_dependencies() -> None:
         assert "astria_service_info" in client.get("/metrics").text
 
 
-def test_not_ready_until_channel_policy_is_loaded() -> None:
+def test_ready_without_policy_or_consumers() -> None:
+    """Tanpa basis data dan NATS tidak ada konsumen, jadi kebijakan tidak diperlukan (smoke image CI)."""
     with TestClient(build_app(Settings(env="test"))) as client:
-        assert client.get("/ready").status_code == 503
+        assert client.get("/ready").status_code == 200
+        assert "policy" not in client.get("/health").json()["checks"]
 
 
 def test_channel_policy_from_file(tmp_path) -> None:
