@@ -10,7 +10,7 @@
 
 Pengiriman notifikasi lewat kanal.
 
-> Status: Tahap 1 (notifier#2). Mengonsumsi `card.verified` dan `digest.published`, memilih kanal dari kebijakan kanal, merender payload allowlist per kanal, menulis `event_outbox`, lalu mendorongnya ke listener internal Gateway dengan HMAC. Notifier tidak pernah menghubungi SMTP atau Telegram sendiri. Repo ini adalah submodule dari workspace `triase-dfir` (folder `notifier/`). Rancangan: `notes/2026-11-06-triase-dfir-app-notifier.md` di repo root. Lajur developer: 2.
+> Status: Tahap 1 (notifier#2). Mengonsumsi `card.verified`, `digest.published`, dan `identity.revoked` (kontrol untuk Gateway), memilih kanal dari kebijakan kanal, merender payload allowlist per kanal, menulis `event_outbox`, lalu mendorongnya ke listener internal Gateway dengan HMAC. Notifier tidak pernah menghubungi SMTP atau Telegram sendiri. Repo ini adalah submodule dari workspace `triase-dfir` (folder `notifier/`). Rancangan: `notes/2026-11-06-triase-dfir-app-notifier.md` di repo root. Lajur developer: 2.
 
 ## Tech stack
 
@@ -37,7 +37,7 @@ Gateway selalu ditiru dengan `httpx.MockTransport`.
 |---|---|
 | `policy.py` | Kebijakan kanal dari konfigurasi saat start: `channel_id`, `type` (`email`/`telegram`/`whatsapp`), `label`, `enabled` (bawaan `false`), `max_detail` (`minimal`/`ringkas`, bawaan `minimal`), `band_min`, `event_types`, `external` (bawaan `true`; Telegram dan WhatsApp selalu eksternal). Kanal dipilih bila aktif, berlangganan jenis event, dan band kartu >= `band_min` (digest tanpa band). Bila konsumen aktif, kebijakan wajib ada |
 | `render.py` | Payload allowlist `extra=forbid`. Kartu `minimal`: `card_id, version, band, skor, status, tautan`. `card.verified` belum membawa `tampilan` tersamarkan, jadi judul, ringkasan, entitas, host, dan akun **tidak pernah** keluar (fail closed). `ringkas` hanya untuk kanal internal: tambah `teknik` (ID ATT&CK), `klaim_total`, `klaim_lolos`; kanal eksternal ber-`ringkas` dikirim `minimal` (`notifier_dropped_total{reason="masking_missing"}`). Digest: `digest_id, jenis, periode_mulai, periode_selesai, tautan`. Band di luar empat nilai atau digest tanpa `digest_id` ditolak (`reason="invalid"`) |
-| `pipeline.py` | Konsumen durable `notifier-card-verified` dan `notifier-digest-published`; baris `event_outbox` (PK `event_id, channel_id`, `payload_hash` SHA-256 JSON kanonik) ditulis di transaksi konsumen. Kartu kedaluwarsa 24 jam setelah `occurred_at`; digest tidak |
+| `pipeline.py` | Konsumen durable `notifier-card-verified`, `notifier-digest-published`, dan `notifier-identity-revoked`; baris `event_outbox` (PK `event_id, channel_id`, `payload_hash` SHA-256 JSON kanonik) ditulis di transaksi konsumen. Kartu kedaluwarsa 24 jam setelah `occurred_at`; digest tidak |
 | `sender.py` | Loop pengirim: kartu lewat `expires_at` menjadi `expired`, lease `sending` yang habis kembali `pending`, lalu maksimal 10 event jatuh tempo disewa (lease 60 detik) dan dikirim berurutan, satu permintaan per event. Jeda naik 5 detik x 2^n (maks 15 menit, jitter 20%), `dead` setelah 10 percobaan |
 | `api.py` | `GET /internal/v1/status` (token layanan, pemanggil `svc:api` atau `svc:config`): jumlah baris per status dan umur `pending` tertua |
 
@@ -72,6 +72,8 @@ Body (satu event, semua kanalnya; `event_id` adalah kunci dedupe, pengiriman ula
 ```
 
 Untuk `digest.published`, `payload` = `{"digest_id", "jenis", "periode_mulai", "periode_selesai", "tautan"}` dengan tautan `/digests/{digest_id}`.
+
+Untuk `identity.revoked` tidak ada kanal: satu baris dengan `channel_id` `*` (kanal kontrol) dan payload `{"user_id", "reason", "revoked_at"}`. Notifier tidak menyimpan penerima; Gateway yang mencabut ikatan kanal `user_id` itu dan tidak lagi mengirim ke identitas tersebut. `roles_after` tidak diteruskan. Event ini tidak kedaluwarsa.
 
 | Respons | Status baris |
 |---|---|

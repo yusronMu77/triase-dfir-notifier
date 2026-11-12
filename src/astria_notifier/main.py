@@ -42,6 +42,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
         for durable, event_type, handler in (
             ("notifier-card-verified", "card.verified", notifier.on_kartu),
             ("notifier-digest-published", "digest.published", notifier.on_digest),
+            ("notifier-identity-revoked", "identity.revoked", notifier.on_identity_revoked),
         ):
             runtime.add(Consumer(runtime.bus, runtime.db, durable=durable, event_type=event_type, handler=handler))
         http = make_client(settings.notifier_gateway_url, timeout=PUSH_TIMEOUT_SECONDS)

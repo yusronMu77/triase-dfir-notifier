@@ -43,3 +43,8 @@ def kartu_event(*, kode: dict[str, Any] | None = None, **data: Any):
 def digest_event(correlation: dict[str, Any] | None = None):
     raw = example("digest.published")
     return decode(encode(new_event("digest.published", raw["data"], correlation=correlation or raw["correlation"])))
+
+
+def revoked_event(**data: Any):
+    raw = example("identity.revoked")
+    return decode(encode(new_event("identity.revoked", raw["data"] | data, correlation=raw["correlation"])))

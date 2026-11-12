@@ -56,7 +56,13 @@ def _dev(**overrides) -> Settings:
 
 def test_consumers_and_sender_are_wired_when_db_and_nats_configured() -> None:
     app = build_app(_dev())
-    expected = {"policy", "consumer:notifier-card-verified", "consumer:notifier-digest-published", "sender"}
+    expected = {
+        "policy",
+        "consumer:notifier-card-verified",
+        "consumer:notifier-digest-published",
+        "consumer:notifier-identity-revoked",
+        "sender",
+    }
     assert expected <= set(app.state.components)
 
 
