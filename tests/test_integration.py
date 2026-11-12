@@ -15,7 +15,7 @@ from astria_common.auth import ServicePrincipal
 from astria_common.db import Database
 from astria_common.hmac_auth import NonceCache, verify
 from fastapi.testclient import TestClient
-from helpers import BASE_URL, assert_no_real_names, channel, digest_event, kartu_event
+from helpers import BASE_URL, assert_no_real_names, channel, digest_event, kartu_event, revoked_event
 from pydantic import SecretStr
 from sqlalchemy import func, select, text, update
 
@@ -120,6 +120,33 @@ async def test_card_below_band_min_or_with_unknown_band_writes_nothing(db: Datab
     await _consume(db, _notifier().on_kartu, kartu_event(kode={"band": "SEDANG", "skor": 40}))
     await _consume(db, _notifier().on_kartu, kartu_event(kode={"band": "DARURAT", "skor": 71}))
     assert await _rows(db) == {}
+
+
+async def test_identity_revoked_is_one_control_row_with_only_allowed_fields(db: Database) -> None:
+    event = revoked_event()
+    await _consume(db, _notifier().on_identity_revoked, event)
+    await _consume(db, _notifier().on_identity_revoked, event)  # dikirim ulang: PK mencegah baris ganda
+
+    rows = await _rows(db)
+    assert set(rows) == {"*"}
+    row = rows["*"]
+    assert (row["type"], row["status"], row["expires_at"]) == ("identity.revoked", "pending", None)
+    payload = row["payload"]
+    assert set(payload) == {"user_id", "reason", "revoked_at"}  # roles_after tidak diteruskan
+    assert (payload["user_id"], payload["reason"]) == ("usr_01J9Z3QK4M", "peran_berubah")
+    assert payload["revoked_at"].startswith("2026-11-12T03:10:00")
+
+
+async def test_identity_revoked_is_pushed_to_gateway_as_control_channel(db: Database) -> None:
+    await _consume(db, _notifier().on_identity_revoked, revoked_event(reason="akun_nonaktif", roles_after=None))
+    gateway = FakeGateway(202)
+    await _sender(db, gateway).send_once()
+
+    body = gateway.bodies[0]
+    assert body["type"] == "identity.revoked"
+    assert [c["channel_id"] for c in body["channels"]] == ["*"]
+    assert set(body["channels"][0]["payload"]) == {"user_id", "reason", "revoked_at"}
+    assert (await _rows(db))["*"]["status"] == "sent"
 
 
 async def test_digest_never_expires(db: Database) -> None:

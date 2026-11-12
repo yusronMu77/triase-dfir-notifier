@@ -1,8 +1,13 @@
-"""Konsumsi `card.verified` dan `digest.published`: pilih kanal, render, tulis `event_outbox` (note notifier 4, 5.2).
+"""Konsumsi `card.verified`, `digest.published`, dan `identity.revoked`: pilih kanal, render, tulis `event_outbox`
+(note notifier 4, 5.2).
 
 Baris outbox ditulis di transaksi konsumen (bersama `processed_events`), satu baris per (event, kanal). Pengiriman
 ke Gateway dikerjakan `sender.Sender`. Event yang ditolak (band tidak dikenal, digest tanpa ID) di-ack tanpa baris
 dan dihitung di `notifier_dropped_total{reason="invalid"}`, bukan dikirim ulang.
+
+`identity.revoked` diteruskan sebagai event kontrol dengan kanal `*`: notifier tidak tahu penerima (ikatan kanal ada di
+Gateway), jadi Gateway yang mencabut ikatan dan berhenti mengirim ke identitas itu. Hanya tiga field yang diteruskan,
+sesuai allowlist Gateway; `roles_after` tidak ikut.
 """
 
 from __future__ import annotations
@@ -15,7 +20,8 @@ from astria_common.log import get_logger
 from astria_contracts import Envelope
 from astria_contracts.events.card_verified import CardVerified
 from astria_contracts.events.digest_published import DigestPublished
-from pydantic import BaseModel, ValidationError
+from astria_contracts.events.identity_revoked import IdentityRevoked
+from pydantic import AwareDatetime, BaseModel, ValidationError
 from sqlalchemy import CheckConstraint, Column, DateTime, Index, Integer, MetaData, Table, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, insert
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -52,6 +58,18 @@ event_outbox = Table(
 Index("event_outbox_due", event_outbox.c.next_attempt_at, postgresql_where=event_outbox.c.status == "pending")
 
 
+CONTROL_CHANNEL = "*"
+"""Kanal kontrol: baris untuk seluruh Gateway, bukan satu kanal (lihat docstring modul)."""
+
+
+class RevokedControl(BaseModel):
+    """Payload kontrol `identity.revoked` ke Gateway: hanya field yang diizinkan allowlist Gateway."""
+
+    user_id: str
+    reason: str
+    revoked_at: AwareDatetime
+
+
 def payload_hash(payload: dict) -> str:
     return hashlib.sha256(orjson.dumps(payload, option=orjson.OPT_SORT_KEYS)).hexdigest()
 
@@ -76,6 +94,11 @@ class Notifier:
             for c in select_channels(self._channels, envelope.type, kode.band)
         }
         await self._write(conn, envelope, payloads, expires_at=envelope.occurred_at + self._card_ttl)
+
+    async def on_identity_revoked(self, conn: AsyncConnection, envelope: Envelope, data: BaseModel) -> None:
+        assert isinstance(data, IdentityRevoked)
+        control = RevokedControl(user_id=data.user_id, reason=data.reason, revoked_at=data.revoked_at)
+        await self._write(conn, envelope, {CONTROL_CHANNEL: control}, expires_at=None)
 
     async def on_digest(self, conn: AsyncConnection, envelope: Envelope, data: BaseModel) -> None:
         assert isinstance(data, DigestPublished)
